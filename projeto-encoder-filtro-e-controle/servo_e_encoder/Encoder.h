@@ -251,20 +251,24 @@ public:
 			// TODO move this table to another static function,
 			// so it doesn't get needlessly duplicated.  Easier
 			// said than done, due to linker issues and inlining
+			// 3, 6, 9, 12: A e B mudaram juntos (transição impossível).
+			// No encoder mecânico isso vem do contato do comum falhando, e
+			// a tabela original somava ±2 sempre para o mesmo lado. Agora
+			// essas transições são ignoradas.
 		"L%=table:"				"\n\t"
 			"rjmp	L%=end"			"\n\t"	// 0
 			"rjmp	L%=plus1"		"\n\t"	// 1
 			"rjmp	L%=minus1"		"\n\t"	// 2
-			"rjmp	L%=plus2"		"\n\t"	// 3
+			"rjmp	L%=end"			"\n\t"	// 3  (era plus2)
 			"rjmp	L%=minus1"		"\n\t"	// 4
 			"rjmp	L%=end"			"\n\t"	// 5
-			"rjmp	L%=minus2"		"\n\t"	// 6
+			"rjmp	L%=end"			"\n\t"	// 6  (era minus2)
 			"rjmp	L%=plus1"		"\n\t"	// 7
 			"rjmp	L%=plus1"		"\n\t"	// 8
-			"rjmp	L%=minus2"		"\n\t"	// 9
+			"rjmp	L%=end"			"\n\t"	// 9  (era minus2)
 			"rjmp	L%=end"			"\n\t"	// 10
 			"rjmp	L%=minus1"		"\n\t"	// 11
-			"rjmp	L%=plus2"		"\n\t"	// 12
+			"rjmp	L%=end"			"\n\t"	// 12 (era plus2)
 			"rjmp	L%=minus1"		"\n\t"	// 13
 			"rjmp	L%=plus1"		"\n\t"	// 14
 			"rjmp	L%=end"			"\n\t"	// 15

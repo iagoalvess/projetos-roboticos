@@ -1,0 +1,567 @@
+\documentclass[12pt]{article}
+
+% Template compartilhado
+\makeatletter
+\def\input@path{{template/}}
+\makeatother
+
+\usepackage{sbc-template}
+
+\usepackage{graphicx,url}
+\usepackage[utf8]{inputenc}
+\usepackage[brazilian]{babel}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage[american]{circuitikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{float}
+
+\sisetup{output-decimal-marker={,}, per-mode=symbol}
+
+% Imagens específicas deste relatório
+\graphicspath{{relatorio-4/imagens/}}
+
+% Pendências: aparecem em vermelho no PDF. Procurar por "\todo" antes de entregar.
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+
+% Inclui a figura se o arquivo existir; senão, desenha uma caixa de TODO.
+% Os gráficos são gerados por analise/graficos.py (PDF ou PNG).
+\newcommand{\figura}[2]{%
+  \IfFileExists{relatorio-4/imagens/#1.pdf}{\includegraphics[width=#2]{#1}}{%
+  \IfFileExists{relatorio-4/imagens/#1.png}{\includegraphics[width=#2]{#1}}{%
+  \IfFileExists{relatorio-4/imagens/#1.jpg}{\includegraphics[width=#2]{#1}}{%
+  \fbox{\parbox[c][4cm][c]{#2}{\centering\textcolor{red}{\textbf{TODO:} figura \url{#1}}}}}}}}
+
+\title{Relatório 4 --- Encoder e Controle PID}
+
+\author{
+  Eduardo Correia\inst{1},
+  Gustavo Amaral\inst{1},
+  Iago Alves\inst{1},
+  Lucas Mariz\inst{1},
+  Renan Oliveira\inst{1}.
+}
+
+\address{
+  Departamento de Ciência da Computação\\
+  Universidade Federal de Minas Gerais (UFMG)
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This work presents the development of a speed control system for a wheel driven by a servo motor. Based on the encoder pulse count, the traveled distance and wheel speed were estimated. To reduce oscillations, a filtering stage was applied before the signal was used by the controller. Finally, a closed-loop control system was implemented to track different speed references and evaluate the system behavior during speed changes and direction reversal.
+\end{abstract}
+
+\begin{resumo}
+Este trabalho apresenta o desenvolvimento de um sistema de controle de velocidade para uma roda acionada por um servo. A partir da contagem dos pulsos do encoder, foram estimadas a distância percorrida e a velocidade da roda. Para reduzir as oscilações, foi empregada uma etapa de filtragem antes da aplicação do sinal ao controlador. Por fim, foi implementado um controle em malha fechada para acompanhar diferentes referências de velocidade e avaliar o comportamento do sistema durante mudanças de velocidade e inversão do sentido de rotação.
+\end{resumo}
+
+
+\section{Introdução}\
+
+O controle de movimento é uma tarefa recorrente em sistemas robóticos, uma vez que o comando enviado a um atuador não garante, por si só, que o movimento desejado será executado. Variações na alimentação, no atrito e na carga mecânica podem alterar a resposta do sistema, tornando necessária a medição do movimento realizado para que seja possível corrigi-lo durante a operação.
+
+Neste trabalho, a movimentação é realizada por um servo de giro contínuo. Diferentemente de um servo convencional, no qual a largura do pulso está relacionada à posição angular, no servo contínuo esse comando determina o sentido e a velocidade de rotação. Entretanto, o servo não fornece diretamente informações sobre quanto a roda girou ou sobre sua velocidade. Para obter essa informação, foi utilizado um encoder incremental, cuja contagem de pulsos permite estimar o deslocamento da roda e, a partir da variação desta contagem no tempo, sua velocidade.
+
+A equipe entrega: a montagem das duas transmissões (servo$\to$roda e roda$\to$encoder) em um lado do chassi impresso; a constante $k$, em milímetros por tick, obtida a partir do diâmetro e dos ticks por volta medidos na própria montagem; a curva pulso $\times$ velocidade do servo em malha aberta, com o neutro encontrado na bancada; a comparação de dois filtros para a velocidade; e uma malha PI(D) de velocidade, avaliada em três ensaios (cinco patamares, inversão de sentido e distância percorrida). O código (projeto PlatformIO para a Mega), os registros dos ensaios e os scripts que refazem todos os gráficos estão no repositório da equipe\footnote{\todo{link do repositório}}.
+
+\section{Montagem e Metodologia Experimental}\
+
+O sistema experimental foi desenvolvido a partir de um conjunto formado por um servo de giro contínuo, uma roda, um encoder incremental e uma placa Arduino Mega. O servo foi responsável pelo acionamento da roda, enquanto o encoder forneceu a realimentação necessária para estimar o deslocamento e a velocidade do conjunto. A transmissão mecânica foi realizada por meio de engrenagens, tanto entre o servo e a roda quanto entre a roda e o encoder.
+
+A metodologia foi dividida em quatro etapas principais. Inicialmente, realizou-se a montagem mecânica e eletrônica do sistema. Em seguida, foram determinados os parâmetros necessários para converter a contagem do encoder em distância e velocidade, além do ponto neutro do servo. A velocidade estimada foi então submetida a uma etapa de filtragem, com o objetivo de reduzir as oscilações causadas pela quantização da leitura. Por fim, foi implementado um controlador em malha fechada para ajustar o comando do servo a partir do erro entre a velocidade desejada e a velocidade medida.
+
+\subsection{Montagem Mecânica e Eletrônica}\
+
+A peça impressa corresponde a um lado do chassi e possui alojamentos para a roda, para o servo SG90 de giro contínuo e para o encoder. Há duas relações mecânicas em série. Na primeira, o pinhão do SG90 aciona a engrenagem solidária à roda; na segunda, outra engrenagem, também solidária à roda, aciona o eixo do encoder. As duas relações entram juntas na contagem: o que interessa ao controle não é a resolução do disco do encoder isoladamente, mas quantos ticks o programa conta quando a \emph{roda} completa uma volta. \todo{descrever as engrenagens da montagem da equipe (número de dentes, se conhecido) e eventuais folgas observadas}
+
+O servo recebe um pulso a cada \SI{20}{\milli\second} (\SI{50}{\hertz}); a largura do pulso, entre \SI{1000}{\micro\second} e \SI{2000}{\micro\second}, comanda sentido e velocidade. O sinal carrega apenas a informação, e a energia vem da alimentação de \SI{5}{\volt}. As ligações na Mega estão resumidas na Tabela~\ref{tab:pinos}. Os canais A e B do encoder foram ligados aos pinos de interrupção D2 e D3, de modo que a biblioteca \texttt{Encoder} conte as bordas de subida e descida dos dois canais (decodificação X4). O encoder da montagem é mecânico, de contato, com três terminais: os dois das pontas são os canais A e B e o do meio é o comum. Ele não recebe alimentação: o comum vai ao GND e os canais usam o pull-up interno dos pinos D2 e D3, que a biblioteca habilita. A Mega trabalha com um Motor Shield v2 empilhado, que não ocupa D2 nem D3 (ele usa o barramento I$^2$C); o servo foi ligado ao conector \emph{Servo~2} do shield, que corresponde ao D9, e é alimentado pelos \SI{5}{\volt} da própria Mega. \todo{conferir se os 5\,V do servo vêm da USB ou de fonte externa}
+
+\begin{table}[H]
+  \centering
+  \caption{Ligações na Arduino Mega.}
+  \label{tab:pinos}
+  \begin{tabular}{lll}
+    \toprule
+    Sinal & Pino da Mega & Observação \\
+    \midrule
+    Servo SG90 (sinal) & D9 & pulso de \SIrange{1000}{2000}{\micro\second} a \SI{50}{\hertz} \\
+    Encoder canal A (ponta) & D2 & interrupção externa, pull-up interno \\
+    Encoder canal B (ponta) & D3 & interrupção externa, pull-up interno \\
+    Encoder comum (terminal do meio) & GND & ver Seção~\ref{sec:correcao_encoder} \\
+    Alimentação do servo & 5\,V e GND & GND comum com a Mega \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+As Figuras~\ref{fig:foto_transmissao}, \ref{fig:foto_roda} e \ref{fig:foto_ligacao} mostram a transmissão engrenada, a roda e a ligação na Mega com os fios identificáveis.
+
+\begin{figure}[H]
+  \centering
+  \figura{foto_transmissao}{0.6\textwidth}
+  \caption{Transmissão engrenada: pinhão do SG90 acionando a roda e engrenagem da roda acionando o encoder. \todo{foto}}
+  \label{fig:foto_transmissao}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \figura{foto_roda}{\textwidth}
+    \caption{Roda montada no chassi. \todo{foto}}
+    \label{fig:foto_roda}
+  \end{minipage}\hfill
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \figura{foto_ligacao}{\textwidth}
+    \caption{Ligação na Mega (D9, D2, D3, 5\,V, GND). \todo{foto}}
+    \label{fig:foto_ligacao}
+  \end{minipage}
+\end{figure}
+
+\subsection{Calibração do Encoder e do Servo}\
+
+O diâmetro $D$ foi medido na roda montada, na banda que toca o chão, pelo comprimento de uma volta marcada sobre papel: marcou-se um ponto na banda da roda e no papel, rolou-se a roda uma volta completa sem deslizar e mediu-se o comprimento $L$ entre as duas marcas, de modo que $D = L/\pi$. O resultado foi $D = \SI{45}{\milli\meter}$ (\SI{4,5}{\centi\meter}). \todo{informar o $L$ medido e quantas repetições foram feitas} O número $N$ de ticks por volta foi obtido girando a roda uma volta inteira à mão, nos dois sentidos, e lendo o contador pelo comando \texttt{c} do firmware, que imprime e zera a contagem. Como a biblioteca conta em X4, o valor que vale é o que o programa conta, e não o PPR impresso no encoder. As primeiras medidas de $N$ não eram confiáveis; a Seção~\ref{sec:correcao_encoder} descreve o problema e a correção, e só as medidas feitas depois dela, na Tabela~\ref{tab:n_final}, entram na Tabela~\ref{tab:constantes}.
+
+\begin{table}[H]
+  \centering
+  \caption{Medida de $N$ depois das correções: ticks contados em uma volta da roda à mão, cinco vezes em cada sentido.}
+  \label{tab:n_final}
+  \begin{tabular}{ccc}
+    \toprule
+    Tentativa & $N_-$ (sentido do lado de \SI{1000}{\micro\second}) & $N_+$ (sentido do lado de \SI{2000}{\micro\second}) \\
+    \midrule
+    1 & $-144$ & 130 \\
+    2 & $-138$ & 139 \\
+    3 & $-141$ & 138 \\
+    4 & $-147$ & 132 \\
+    5 & $-146$ & 143 \\
+    \midrule
+    média & $-143{,}2$ & 136,4 \\
+    desvio padrão & 3,7 & 5,3 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Os dois sentidos dão sinais opostos e módulos próximos. Ainda há diferença: em média, o sentido negativo contou 6,8 ticks a mais (cerca de 5\,\%), e cada sentido espalhou alguns ticks entre tentativas. Um tick corresponde a $360^\circ/140 \approx 2{,}6^\circ$ de giro da roda, de modo que parte do espalhamento vem do alinhamento da marca da volta, feito a olho. O restante é compatível com a trepidação residual do contato mecânico: quando uma falha do comum coincide com uma transição real, a transição é descartada junto com o ruído, e a contagem sai um pouco menor. A folga das engrenagens não explica a diferença, porque em cada volta a roda girou sempre no mesmo sentido. Como o controle e a medida de distância usam um único $k$ nos dois sentidos, adotou-se a média dos dez módulos, $N = 139{,}8 \approx 140$ ticks por volta; a incerteza associada, da ordem de $\pm 3$\,\%, aparece na comparação de distâncias da Seção~\ref{sec:distancia}.
+
+\subsubsection{Verificação e correção da contagem do encoder}
+\label{sec:correcao_encoder}
+
+\paragraph{Sintoma.} Na primeira medida de $N$, a roda foi girada uma volta à mão em cada sentido, cinco vezes. A Tabela~\ref{tab:n_inicial} mostra o resultado, com os sentidos identificados pelo lado do pulso que gira a roda naquele sentido. Havia três problemas: a contagem saiu \emph{positiva nos dois sentidos}, quando um deles deveria ser negativo; os valores de uma mesma volta variaram de 226 a 814 ticks, quando deveriam se repetir a menos de um ou dois ticks; e o sentido do lado de \SI{2000}{\micro\second} contou, em média, cerca de 30\,\% a mais que o outro.
+
+\begin{table}[H]
+  \centering
+  \caption{Primeira medida de $N$ (contagem de uma volta à mão), antes das correções. Os valores foram lidos no comando \texttt{c} e saíram todos positivos.}
+  \label{tab:n_inicial}
+  \begin{tabular}{ccc}
+    \toprule
+    Tentativa & Sentido do lado de \SI{1000}{\micro\second} & Sentido do lado de \SI{2000}{\micro\second} \\
+    \midrule
+    1 & 583 & 814 \\
+    2 & 537 & 685 \\
+    3 & 533 & 657 \\
+    4 & 226 & 753 \\
+    5 & 578 & 674 \\
+    \midrule
+    média & 491 & 717 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Como a biblioteca decodifica.} A biblioteca \texttt{Encoder} guarda o estado anterior dos dois canais e, a cada interrupção, compara com o estado atual. Em quadratura os canais seguem a sequência de Gray $00 \to 01 \to 11 \to 10 \to 00$ num sentido e a inversa no outro, e cada passo vale $\pm 1$ tick. Uma mudança dos dois canais \emph{ao mesmo tempo} ($00 \leftrightarrow 11$ ou $01 \leftrightarrow 10$) não existe em quadratura; a biblioteca original a interpreta como um passo perdido e soma $+2$ ou $-2$, sempre com o mesmo sinal para a mesma transição. Se A e B mudam juntos, a contagem cresce em qualquer sentido de giro, que é o comportamento observado.
+
+\paragraph{Ferramenta de diagnóstico.} Para ver os canais diretamente, o firmware ganhou o comando \texttt{e}, que imprime o nível de A, o nível de B e a contagem a cada mudança dos pinos. Com o encoder bem ligado e a roda girando devagar, deve aparecer a sequência de Gray completa e a contagem deve subir de um em um num sentido e descer no outro.
+
+\paragraph{Primeira causa: o comum ligado a um canal.} O encoder tem três terminais, e o comum é o do meio. Na montagem inicial, o fio do terminal do meio estava em um pino de sinal da Mega e o GND estava em um terminal da ponta. Assim, um dos ``canais'' era na verdade o comum, e os dois pinos não formavam um par em quadratura. Como os fios do encoder não podiam ser trocados do lado dele, a correção foi feita na Mega: o fio do terminal do meio passou para o GND, e o fio que estava no GND passou para o pino de sinal liberado. Depois disso, o comando \texttt{e} passou a mostrar os quatro estados na ordem de Gray, e a contagem passou a descer em alguns trechos, o que antes não acontecia.
+
+\paragraph{Segunda causa: falha no contato do comum.} Mesmo com a ligação correta, uma volta à mão ainda dava contagem positiva nos dois sentidos. O registro do comando \texttt{e} mostrou a razão: além das transições válidas, havia saltos diretos entre $00$ e $11$ acompanhados de pulos de vários ticks na contagem (por exemplo, de 7 para 19 e de 89 para 117). Num encoder mecânico, quando o contato do comum se abre por um instante, os dois canais sobem juntos para 1 pelo pull-up e depois voltam juntos. Cada falha dessas é uma transição $00 \to 11 \to 00$, que a tabela original contava como $+2+2$, sempre para o mesmo lado. Girando devagar à mão, as falhas eram muitas e encobriam a contagem real; com o motor girando rápido, como no ensaio em malha aberta, a contagem real dominava e o defeito passava despercebido.
+
+A correção foi na tabela de decodificação da biblioteca (arquivo \texttt{Encoder.h}, rotina em assembly usada no AVR): as quatro transições impossíveis passaram a valer zero, em vez de $\pm 2$. Essa mudança não faz perder ticks verdadeiros. Na velocidade máxima da roda, cerca de 500~ticks/s, há em torno de \SI{2}{\milli\second} entre transições, muito mais que o tempo de atendimento da interrupção, de poucos microssegundos; um salto de dois estados só aparece, na prática, quando os dois canais mudam juntos, isto é, por falha do contato.
+
+\paragraph{Resultado e sentido da contagem.} Com as duas correções, uma volta à mão passou a dar contagens de sinais opostos nos dois sentidos, com módulos próximos (148 e 144 ticks numa primeira verificação). Adotou-se a convenção de que pulsos abaixo do neutro (lado de \SI{1000}{\micro\second}) produzem contagem negativa e pulsos acima do neutro (lado de \SI{2000}{\micro\second}) produzem contagem positiva. O firmware tem a constante \texttt{SINAL\_ENCODER}, que multiplica a leitura da biblioteca e permite inverter o sentido sem mexer nos fios (a alternativa equivalente seria trocar os canais entre D2 e D3). A convenção foi conferida com o próprio servo girando a roda, no ensaio em malha aberta: com \texttt{SINAL\_ENCODER = 1}, o pulso de \SI{1000}{\micro\second} produziu velocidade positiva, isto é, a ligação conta ao contrário da convenção, e o valor adotado foi \texttt{SINAL\_ENCODER = -1}. Antes disso, houve tentativas de identificar o sentido girando a roda à mão, que levaram a conclusões contraditórias: à mão é fácil confundir qual giro corresponde a cada lado do pulso. O sentido deve ser conferido com o motor. A constante só troca o sinal dos números; o sentido físico em que a roda gira para cada pulso é dado pelo servo. \todo{confirmar no ensaio \texttt{a} refeito, com \texttt{sinal\_enc=-1} no cabeçalho, que \SI{1000}{\micro\second} dá velocidade negativa}
+
+O valor $N = 140$ é cerca de metade dos 288 ticks do mecanismo de referência. Como o número que vale é o que o programa conta na montagem da equipe, a diferença indica que o encoder ou a redução entre a roda e o encoder não são os da referência. \todo{explicar com o número de dentes das engrenagens e/ou o número de pulsos por volta do encoder}
+
+A partir do diâmetro $D$ da roda e do número $N$ de ticks registrados durante uma volta completa, calculou-se a distância correspondente a cada tick do encoder por
+
+\begin{equation}
+    k = \frac{\pi D}{N},
+    \label{eq:mm_por_tick}
+\end{equation}
+
+em que $k$ é dado em milímetros por tick.
+
+A distância percorrida foi então obtida a partir da contagem acumulada de ticks:
+
+\begin{equation}
+    s = k\,n,
+    \label{eq:distancia_encoder}
+\end{equation}
+
+em que $n$ representa o número acumulado de ticks. Os valores medidos estão na Tabela~\ref{tab:constantes}. Como conferência, o mecanismo de referência da bancada tem $D = \SI{49,2}{\milli\meter}$ e $N = 288$ ticks (48 pulsos do encoder e redução 1:6 até a roda), o que dá $k = \SI{0,537}{\milli\meter}$ por tick. Na montagem da equipe, com $D = \SI{45,0}{\milli\meter}$ e $N = 140$, obteve-se
+\begin{equation*}
+    k = \frac{\pi \times 45{,}0}{140} \approx \SI{1,010}{\milli\meter}\ \text{por tick},
+\end{equation*}
+quase o dobro do $k$ de referência: cada tick da montagem da equipe representa um avanço maior da roda, e a medida é mais grossa.
+
+\begin{table}[H]
+  \centering
+  \caption{Constantes medidas na bancada e parâmetros usados nos ensaios.}
+  \label{tab:constantes}
+  \begin{tabular}{llll}
+    \toprule
+    Símbolo & Significado & Valor & Unidade \\
+    \midrule
+    $D$ & diâmetro da roda (volta marcada no papel) & 45,0 & mm \\
+    $N_+$ & ticks por volta, lado de \SI{2000}{\micro\second} (média de 5) & 136,4 & ticks \\
+    $N_-$ & ticks por volta, lado de \SI{1000}{\micro\second} (média de 5) & $-143{,}2$ & ticks \\
+    $N$ & valor adotado (média dos 10 módulos) & 140 & ticks \\
+    $k$ & avanço por tick, Eq.~\eqref{eq:mm_por_tick} & 1,010 & mm/tick \\
+    $\Delta t$ & período de amostragem (medido) & \todo{50,0} & ms \\
+    $q$ & degrau de velocidade, Eq.~\eqref{eq:resolucao_velocidade} & 20,2 & mm/s \\
+    neutro & pulso em que a roda para (centro da banda morta) & 1500 & \si{\micro\second} \\
+    $\alpha$ & passa-baixa de 1ª ordem (comparação) & 0,3 & --- \\
+    $M$ & janela da média móvel (usada no PID) & 5 & amostras \\
+    $K_p$ & ganho proporcional & \todo{} & \si{\micro\second}/(mm/s) \\
+    $K_i$ & ganho integral & \todo{} & \si{\micro\second\per\milli\meter} \\
+    $K_d$ & ganho derivativo & \todo{} & \si{\micro\second\second\per\milli\meter} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+O neutro do servo é o pulso em que a roda para. Ele foi procurado na bancada com o comando \texttt{n}, que aplica pulsos de \SIrange{1450}{1550}{\micro\second} em passos de \SI{10}{\micro\second}, \SI{2}{\second} cada, registrando a velocidade (Figura~\ref{fig:neutro}). Como em torno do neutro existe uma faixa de pulsos em que a roda não gira (banda morta), adotou-se o centro dessa faixa, valor gravado no firmware na constante \texttt{NEUTRO\_US}.
+
+De \SIrange{1480}{1530}{\micro\second} a roda ficou parada, sem nenhum tick em regime. Em \SI{1470}{\micro\second} ela ficou no limite: na maior parte do tempo parada, com pequenos avanços esporádicos de dois ou três ticks, o que dá uma média de \SI{-4}{\milli\meter\per\second}. Em \SI{1460}{\micro\second} ela já girava no sentido negativo, a cerca de \SI{44}{\milli\meter\per\second}, e em \SI{1540}{\micro\second} no sentido positivo, a cerca de \SI{40}{\milli\meter\per\second}. A banda morta vai, portanto, de cerca de \SI{1470}{\micro\second} a \SI{1530}{\micro\second}, com \SI{60}{\micro\second} de largura e bordas conhecidas a menos do passo de \SI{10}{\micro\second}. Ela é praticamente simétrica em torno de \SI{1500}{\micro\second}, e esse foi o neutro adotado. Fora da banda morta a roda não parte devagar: o primeiro passo já leva a velocidade de zero para mais de \SI{40}{\milli\meter\per\second}. Velocidades menores que essa não se sustentam com pulso constante, o que limita o patamar mais lento que a malha consegue manter.
+
+\begin{figure}[H]
+  \centering
+  \figura{neutro}{0.75\textwidth}
+  \caption{Busca do neutro: velocidade média em regime para cada pulso em torno de \SI{1500}{\micro\second} ($k = \SI{1,010}{\milli\meter}$ por tick, $\Delta t = \SI{50}{\milli\second}$).}
+  \label{fig:neutro}
+\end{figure}
+
+\subsection{Estimativa e Filtragem da Velocidade}\
+
+A velocidade é calculada a cada período de amostragem a partir da variação da contagem do encoder. O firmware usa um temporizador por \texttt{micros()} com período nominal de \SI{50}{\milli\second}, e o $\Delta t$ empregado na conta é o intervalo \emph{realmente medido} entre duas leituras, e não o valor nominal:
+
+\begin{equation}
+    v = \frac{\Delta s}{\Delta t},
+    \label{eq:velocidade}
+\end{equation}
+
+\begin{equation}
+    v = \frac{k\,\Delta n}{\Delta t},
+    \label{eq:velocidade_ticks}
+\end{equation}
+
+Como a contagem do encoder ocorre em valores inteiros, a resolução da velocidade depende do intervalo de amostragem. O menor incremento observável é dado por
+
+\begin{equation}
+    q = \frac{k}{\Delta t},
+    \label{eq:resolucao_velocidade}
+\end{equation}
+
+o que faz com que a velocidade bruta apresente um comportamento quantizado em degraus. Com o $k$ de referência e $\Delta t = \SI{50}{\milli\second}$, $q \approx \SI{10,7}{\milli\meter\per\second}$; com os valores da equipe ($k = \SI{1,010}{\milli\meter}$ por tick), $q \approx \SI{20,2}{\milli\meter\per\second}$ \todo{confirmar com o $\Delta t$ médio do registro (impresso por \texttt{graficos.py})}. Em velocidade baixa esse degrau é grande em termos relativos: a \SI{40}{\milli\meter\per\second} cabem apenas cerca de 2 ticks em uma janela, e um tick a mais ou a menos muda a leitura bruta para 20 ou \SI{61}{\milli\meter\per\second}, isto é, $\pm$50\,\% em torno do valor verdadeiro. É essa leitura que o filtro precisa suavizar antes de entrar no PID.
+
+Para reduzir esse ruído de quantização, a velocidade passa por um filtro antes de entrar no PID; a distância $s$ segue sem filtro. Foram comparados dois filtros, calculados em paralelo no mesmo registro:
+
+\textbf{Passa-baixa de primeira ordem}, com parâmetro $\alpha$:
+\begin{equation}
+    \hat v_k = \hat v_{k-1} + \alpha\,(v_k - \hat v_{k-1}).
+    \label{eq:passa_baixa}
+\end{equation}
+Sua constante de tempo equivalente é $\tau \approx \Delta t\,(1-\alpha)/\alpha$, cerca de \SI{117}{\milli\second} para $\alpha = 0{,}3$, e, para ruído branco na entrada, a variância é reduzida pelo fator $\alpha/(2-\alpha) \approx 0{,}18$.
+
+\textbf{Média móvel} de $M$ amostras:
+\begin{equation}
+    \hat v_k = \frac{1}{M}\sum_{j=0}^{M-1} v_{k-j}.
+    \label{eq:media_movel}
+\end{equation}
+Ela atrasa o sinal em $(M-1)\Delta t/2$, ou \SI{100}{\milli\second} para $M = 5$, e reduz a variância do ruído branco pelo fator $1/M = 0{,}2$.
+
+Os parâmetros $\alpha = 0{,}3$ e $M = 5$ foram escolhidos de forma que os dois filtros tivessem atenuação de ruído e atraso semelhantes, para que a comparação fosse principalmente sobre a forma da resposta. O ensaio \texttt{f} confirmou essa escolha (mesmo ruído e mesmo atraso), e os dois valores foram mantidos.
+
+\subsection{Controle de Velocidade}\
+
+A malha de velocidade está na Figura~\ref{fig:malha}. O setpoint é dado em mm/s; a saída do PID é uma correção $u$, em microssegundos, somada ao pulso neutro.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[>=latex, font=\small]
+    \draw[->] (0,0) node[left]{$v^*$} -- (0.8,0);
+    \draw (1.05,0) circle (0.25) node{$\Sigma$};
+    \draw[->] (1.3,0) -- node[above]{$e$} (2.3,0);
+    \draw (2.3,-0.45) rectangle node{PID} (3.9,0.45);
+    \draw[->] (3.9,0) -- node[above]{$u$} (4.7,0);
+    \draw (4.7,-0.45) rectangle node[align=center]{neutro\\$+\,u$} (6.1,0.45);
+    \draw[->] (6.1,0) -- node[above]{pulso} (7.2,0);
+    \draw (7.2,-0.45) rectangle node{SG90 + roda} (9.2,0.45);
+    \draw[->] (9.2,0) -- (10.6,0) node[right]{$v$};
+    \draw[->] (9.9,0) -- (9.9,-1.5) -- (9.2,-1.5);
+    \draw (7.2,-1.95) rectangle node{encoder} (9.2,-1.05);
+    \draw[->] (7.2,-1.5) -- node[above]{ticks} (6.1,-1.5);
+    \draw (4.3,-1.95) rectangle node{$\Delta s/\Delta t$ + filtro} (6.1,-1.05);
+    \draw[->] (4.3,-1.5) -- node[above]{$\hat v$} (1.05,-1.5) -- (1.05,-0.25) node[left, pos=0.8]{$-$};
+  \end{tikzpicture}
+  \caption{Malha de velocidade. O setpoint é em mm/s e a saída do PID é uma correção, em microssegundos, somada ao neutro.}
+  \label{fig:malha}
+\end{figure}
+
+O erro utilizado pelo controlador foi definido como a diferença entre a velocidade de referência e a velocidade medida, já filtrada:
+
+\begin{equation}
+    e(t) = v_{\mathrm{ref}}(t) - \hat v(t).
+\end{equation}
+
+A correção aplicada ao comando do servo foi calculada por meio de um controlador PID:
+
+\begin{equation}
+    u(t)
+    =
+    K_p e(t)
+    +
+    K_i \int e(t)\,dt
+    -
+    K_d \frac{d\hat v(t)}{dt},
+    \label{eq:pid}
+\end{equation}
+
+em que $K_p$, $K_i$ e $K_d$ representam, respectivamente, os ganhos proporcional, integral e derivativo. O termo derivativo atua sobre a velocidade medida e não sobre o erro, o que evita o pico de derivada quando o setpoint muda em degrau. Com $e$ em mm/s e $u$ em \si{\micro\second}, as unidades dos ganhos são as da Tabela~\ref{tab:constantes}.
+
+No firmware a lei é discretizada com o $\Delta t_k$ medido em cada amostra:
+\begin{align}
+    I_k &= \operatorname{sat}_{\pm U/K_i}\!\left(I_{k-1} + e_k\,\Delta t_k\right), \\
+    u_k &= \operatorname{sat}_{\pm U}\!\left(K_p e_k + K_i I_k - K_d \frac{\hat v_k - \hat v_{k-1}}{\Delta t_k}\right), \\
+    \text{pulso}_k &= \operatorname{sat}_{[1000,\,2000]}\left(\text{neutro} + u_k\right),
+\end{align}
+com $U = \SI{250}{\micro\second}$. A integral é limitada para que o termo integral sozinho não ultrapasse a correção máxima (anti-windup) e é zerada sempre que o setpoint muda, para não carregar o erro do patamar anterior. Quando o setpoint é nulo, o firmware aplica diretamente o neutro, para que a malha não fique ``caçando'' a banda morta com a roda parada.
+
+A sintonia foi feita na bancada com o comando \texttt{d} (degrau de 0 para \todo{100}\,mm/s em malha fechada), trocando um ganho por vez pelos comandos seriais \texttt{P}, \texttt{I} e \texttt{D}, sem regravar o firmware. Com $K_i = K_d = 0$, aumentou-se $K_p$ até a resposta ficar rápida e começar a oscilar, voltando para um valor menor; depois aumentou-se $K_i$ até o erro em regime desaparecer, parando quando o sobressinal passou a incomodar. O $K_d$ só seria usado se ainda restasse sobressinal. \todo{informar se Ziegler--Nichols foi usado como ponto de partida ($K_u$, $T_u$)}
+
+\subsection{Procedimento dos Ensaios}\
+
+Todos os ensaios são disparados por um caractere enviado pela serial (\115200~baud) e gravados em arquivo pelo script \texttt{analise/captura.py}. Cada amostra é uma linha CSV com tempo, ticks, distância, velocidade bruta, velocidades filtradas pelos dois filtros, setpoint e pulso, e cada arquivo começa com uma linha que declara a condição do ensaio (neutro, $D$, $N$, $k$, $\Delta t$, $\alpha$, $M$, filtro usado e ganhos). O script \texttt{analise/graficos.py} refaz todos os gráficos e métricas a partir desses arquivos. A Tabela~\ref{tab:comandos} resume os comandos.
+
+\begin{table}[H]
+  \centering
+  \caption{Comandos do firmware e ensaios correspondentes.}
+  \label{tab:comandos}
+  \begin{tabular}{cl}
+    \toprule
+    Comando & Ensaio \\
+    \midrule
+    \texttt{c} & imprime e zera os ticks (medida de $N$ à mão) \\
+    \texttt{n} & busca do neutro: \SIrange{1450}{1550}{\micro\second}, passo \SI{10}{\micro\second}, \SI{2}{\second} cada \\
+    \texttt{a} & malha aberta: \SIrange{1000}{2000}{\micro\second}, passo \SI{50}{\micro\second}, \SI{3}{\second} cada \\
+    \texttt{f} & degrau em malha aberta (neutro $\to$ neutro $+$ \SI{150}{\micro\second}) para os filtros \\
+    \texttt{d} & degrau em malha fechada para a sintonia \\
+    \texttt{p} & cinco patamares em malha fechada, \SI{3}{\second} cada \\
+    \texttt{i} & inversão de sentido: $+V$ por \SI{4}{\second}, $-V$ por \SI{4}{\second} \\
+    \texttt{P}, \texttt{I}, \texttt{D} & trocam $K_p$, $K_i$, $K_d$ (ex.: \texttt{P1.5}) \\
+    \texttt{s} & interrompe o ensaio e aplica o neutro \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Resultados e Discussão}\
+
+Nesta seção são apresentados os principais resultados obtidos durante os ensaios do sistema. São analisados o comportamento da velocidade medida e filtrada, a resposta do controlador para diferentes referências, a inversão do sentido de rotação e a distância percorrida ao longo dos testes. A partir desses resultados, é possível avaliar tanto a qualidade da estimativa fornecida pelo encoder quanto o desempenho do controle em malha fechada.
+
+\subsection{Caracterização da Medição de Velocidade}\
+
+\paragraph{Curva em malha aberta.} Antes do PID foi levantada a curva do próprio servo com o comando \texttt{a}: pulsos de \SIrange{1000}{2000}{\micro\second}, nos dois sentidos, cada um por \SI{3}{\second}. Para cada pulso descartou-se o primeiro segundo (transitório de arranque) e tomou-se a média da velocidade no restante. A Figura~\ref{fig:curva_aberta} mostra o resultado, com o neutro marcado e a faixa de neutro $\pm\SI{250}{\micro\second}$ em que o PID pode atuar.
+
+\begin{figure}[H]
+  \centering
+  \figura{curva_aberta}{0.85\textwidth}
+  \caption{Curva pulso $\times$ velocidade em regime, em malha aberta, com o neutro e a faixa de atuação do PID ($\pm\SI{250}{\micro\second}$) marcados.}
+  \label{fig:curva_aberta}
+\end{figure}
+
+\begin{table}[H]
+  \centering
+  \caption{Velocidade em regime na malha aberta, por distância do pulso ao neutro.}
+  \label{tab:curva_aberta}
+  \begin{tabular}{rrrr}
+    \toprule
+    $|\text{pulso} - \text{neutro}|$ (\si{\micro\second}) & lado de \SI{1000}{\micro\second} (mm/s) & lado de \SI{2000}{\micro\second} (mm/s) & diferença \\
+    \midrule
+     50 & $-62{,}6$  &  51,5 & 22\,\% \\
+    100 & $-86{,}3$  &  71,7 & 20\,\% \\
+    150 & $-103{,}6$ &  91,4 & 13\,\% \\
+    200 & $-129{,}8$ & 116,1 & 12\,\% \\
+    250 & $-143{,}4$ & 141,9 &  1\,\% \\
+    300 & $-169{,}1$ & 155,3 &  9\,\% \\
+    350 & $-184{,}3$ & 166,5 & 11\,\% \\
+    400 & $-208{,}8$ & 193,9 &  8\,\% \\
+    450 & $-225{,}8$ & 215,1 &  5\,\% \\
+    500 & $-246{,}1$ & 245,9 &  0\,\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Banda morta.} Com passo de \SI{50}{\micro\second}, só o neutro ficou parado: em \SI{1450}{\micro\second} e \SI{1550}{\micro\second} a roda já gira, o que concorda com a banda de \SIrange{1470}{1530}{\micro\second} da busca do neutro. A curva tem um salto na saída da banda morta: o primeiro pulso fora dela já dá cerca de \SI{50}{\milli\meter\per\second} no lado positivo e \SI{60}{\milli\meter\per\second} no negativo. Com pulso constante, não há velocidade estável entre zero e esses valores.
+
+\textbf{Forma da curva e saturação.} Depois do salto, a curva é aproximadamente linear até as pontas, com inclinação de cerca de \SI{0,4}{\milli\meter\per\second} por microssegundo nos dois lados: entre $\pm\SI{50}{\micro\second}$ e $\pm\SI{250}{\micro\second}$ a inclinação é de 0,40 (lado negativo) e 0,45 (lado positivo), e entre $\pm\SI{250}{\micro\second}$ e $\pm\SI{500}{\micro\second}$, de 0,41 e 0,42. Não houve saturação clara até os extremos de 1000 e \SI{2000}{\micro\second}, onde a velocidade chegou a cerca de \SI{246}{\milli\meter\per\second} nos dois sentidos. Essa inclinação é o ganho da planta visto pelo PID: com $K_p = \SI{1}{\micro\second}/(\si{\milli\meter\per\second})$, o ganho de malha fica em torno de 0,4.
+
+\textbf{Assimetria.} Para a mesma distância ao neutro, o lado de \SI{1000}{\micro\second} é mais rápido, sobretudo perto do neutro (cerca de 20\,\% a \SI{50}{\micro\second} e \SI{100}{\micro\second}); a diferença diminui com a distância e praticamente desaparece nas pontas. Isso é compatível com o neutro real estar um pouco acima de \SI{1500}{\micro\second}: a busca do neutro mostrou a borda negativa da banda morta (\SI{1470}{\micro\second}) já no limite do movimento, enquanto a positiva (\SI{1530}{\micro\second}) ainda estava parada. Na malha fechada, a integral do PID absorve essa diferença.
+
+\textbf{Faixa do PID.} Dentro de neutro $\pm\SI{250}{\micro\second}$, a velocidade máxima é de cerca de \SI{142}{\milli\meter\per\second} nos dois sentidos. Com o mínimo estável de cerca de \SI{50}{\milli\meter\per\second}, os cinco patamares foram escolhidos entre 60 e \SI{120}{\milli\meter\per\second}, com margem nas duas pontas, e as velocidades da inversão e do degrau de sintonia ficaram em \SI{100}{\milli\meter\per\second}, alcançável nos dois sentidos com cerca de \SI{150}{\micro\second} de correção.
+
+\textbf{Ruído e repetibilidade.} O desvio padrão da velocidade bruta em regime ficou entre 17 e \SI{38}{\milli\meter\per\second}, isto é, entre um e dois degraus de quantização $q = \SI{20,2}{\milli\meter\per\second}$; é esse ruído que o filtro precisa reduzir. O ensaio foi repetido três vezes durante a correção do sentido da contagem, e as três curvas concordaram em módulo a cerca de $\pm\SI{10}{\milli\meter\per\second}$.
+
+\paragraph{Comparação dos filtros.} Com o comando \texttt{f} aplicou-se, em malha aberta, um degrau do neutro para neutro $+\SI{150}{\micro\second}$, registrando no mesmo ensaio a velocidade bruta e as saídas dos dois filtros (Figura~\ref{fig:filtros}). A Tabela~\ref{tab:filtros} resume o desvio padrão no regime (ruído remanescente) e o tempo até 63\,\% do valor final (atraso).
+
+\begin{figure}[H]
+  \centering
+  \figura{filtros}{0.85\textwidth}
+  \caption{Velocidade bruta e saídas do passa-baixa ($\alpha = 0{,}3$) e da média móvel ($M = 5$) no mesmo degrau de \SI{1500}{\micro\second} para \SI{1650}{\micro\second} ($t = \SI{1}{\second}$) e de volta ao neutro ($t = \SI{5}{\second}$).}
+  \label{fig:filtros}
+\end{figure}
+
+\begin{table}[H]
+  \centering
+  \caption{Ruído e atraso dos filtros no degrau (valores de \texttt{dados/resumo.txt}).}
+  \label{tab:filtros}
+  \begin{tabular}{lccccc}
+    \toprule
+    Sinal & Regime & Desvio padrão & $t_{63\%}$ & Desvio da derivada & Parada ($<\SI{5}{\milli\meter\per\second}$) \\
+     & (mm/s) & (mm/s) & (s) & (\si{\milli\meter\per\second\squared}) & (s) \\
+    \midrule
+    Bruta & 86,7 & 26,1 & 0,05 & 832 & 0,10 \\
+    Passa-baixa, $\alpha = 0{,}3$ & 87,3 & 7,0 & 0,25 & 185 & 0,45 \\
+    Média móvel, $M = 5$ & 87,4 & 7,1 & 0,25 & 157 & 0,25 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+As três primeiras colunas vêm de \texttt{dados/resumo.txt}; o desvio da derivada foi calculado no regime (de 2 a \SI{4,9}{\second}) como o desvio padrão de $\Delta\hat v/\Delta t$, e a parada é o tempo, depois da volta ao neutro, até a velocidade ficar abaixo de \SI{5}{\milli\meter\per\second}.
+
+\textbf{Ruído.} A velocidade bruta oscila entre degraus de $q = \SI{20,2}{\milli\meter\per\second}$, com desvio de \SI{26}{\milli\meter\per\second} em torno de \SI{87}{\milli\meter\per\second}, e tem picos isolados, como o de \SI{162}{\milli\meter\per\second} perto de $t = \SI{3,4}{\second}$, seguido de uma amostra baixa que o compensa. Os dois filtros reduziram o desvio para cerca de \SI{7}{\milli\meter\per\second}, quase quatro vezes menos, e deram o mesmo valor de regime. Restam no sinal filtrado quedas lentas de velocidade, como a de 2,2 a \SI{2,5}{\second}, que duram vários períodos e por isso passam pelos dois filtros: são variações reais da roda (atrito ou excentricidade ao longo da volta), e não ruído de medida, e cabe ao controle corrigi-las.
+
+\textbf{Atraso e forma.} Os dois filtros levaram \SI{0,25}{\second} para chegar a 63\,\% do valor final, contra \SI{0,05}{\second} da bruta; como $\alpha$ e $M$ foram escolhidos para atrasos semelhantes, a diferença está na forma. A média móvel sobe em rampa e esquece o passado depois de $M$ amostras: na volta ao neutro, ela chegou a exatamente zero em \SI{0,25}{\second}. O passa-baixa responde de forma exponencial e nunca descarta todo o histórico: a cauda dele ficou acima de \SI{5}{\milli\meter\per\second} por \SI{0,45}{\second} e só sumiu perto de $t = \SI{6}{\second}$.
+
+\textbf{Efeito no derivativo e no sobressinal.} Derivar a velocidade bruta dá desvio de \SI{832}{\milli\meter\per\second\squared}, com picos de \SI{1600}{\milli\meter\per\second\squared}: cada tick a mais ou a menos numa janela vale $q/\Delta t \approx \SI{400}{\milli\meter\per\second\squared}$. Com os filtros o desvio caiu para 185 (passa-baixa) e \SI{157}{\milli\meter\per\second\squared} (média móvel). Como o termo derivativo multiplica essa derivada, ele só é viável sobre a velocidade filtrada, e mesmo assim com $K_d$ pequeno. O atraso de \SI{0,25}{\second} do filtro entra na malha: a correção do PID reage a uma velocidade de alguns períodos atrás, o que, para o mesmo $K_p$, aumenta o sobressinal e limita o ganho antes da oscilação.
+
+\textbf{Escolha.} A malha final usa a média móvel ($M = 5$, \texttt{PID\_USA\_PB = false}). Com ruído e atraso iguais aos do passa-baixa, ela deu uma derivada cerca de 15\,\% menos ruidosa e esqueceu o passado mais cedo, o que ajuda na inversão de sentido, em que a velocidade antiga não deve continuar pesando na realimentação. Os parâmetros $\alpha = 0{,}3$ e $M = 5$ foram mantidos.
+
+\subsection{Sintonia do Controlador}\
+
+A Tabela~\ref{tab:sintonia} registra as tentativas feitas com o degrau em malha fechada e a Figura~\ref{fig:sintonia} sobrepõe as respostas.
+
+\begin{table}[H]
+  \centering
+  \caption{Tentativas de sintonia (degrau de 0 para \todo{100}\,mm/s). $K_p$ em \si{\micro\second}/(mm/s), $K_i$ em \si{\micro\second\per\milli\meter} e $K_d$ em \si{\micro\second\second\per\milli\meter}.}
+  \label{tab:sintonia}
+  \begin{tabular}{cccp{5.2cm}p{3.8cm}}
+    \toprule
+    $K_p$ & $K_i$ & $K_d$ & O que o gráfico mostrou & Decisão \\
+    \midrule
+    \todo{} & 0 & 0 & \todo{p.\,ex. erro parado de X mm/s, sem oscilação} & aumentar $K_p$ \\
+    \todo{} & 0 & 0 & \todo{p.\,ex. oscilação sustentada, pulso ruidoso} & reduzir $K_p$ \\
+    \todo{} & 0 & 0 & \todo{} & incluir $K_i$ \\
+    \todo{} & \todo{} & 0 & \todo{p.\,ex. erro some, sobressinal de Y\,\%} & \todo{} \\
+    \todo{} & \todo{} & \todo{} & \todo{} & ganhos finais \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \figura{sintonia}{0.85\textwidth}
+  \caption{Respostas ao degrau em malha fechada para os ganhos da Tabela~\ref{tab:sintonia}. \todo{gravar cada tentativa com \texttt{captura.py d -{}-nome degrau\_pid\_N -{}-ganhos ...}}}
+  \label{fig:sintonia}
+\end{figure}
+
+Os ganhos finais foram $K_p = $ \todo{}\,\si{\micro\second}/(mm/s), $K_i = $ \todo{}\,\si{\micro\second\per\milli\meter} e $K_d = $ \todo{}\,\si{\micro\second\second\per\milli\meter}. Os três ensaios a seguir usam a mesma malha, os mesmos ganhos e o mesmo filtro, nas condições da Tabela~\ref{tab:constantes}.
+
+\subsection{Resposta em Cinco Patamares}\
+
+A roda parte do repouso e percorre cinco velocidades positivas em ordem crescente, 60, 75, 90, 105 e 120\,mm/s, \SI{3}{\second} cada. O patamar mais lento é o menor que a malha ainda segura, e o mais rápido foi escolhido dentro da faixa alcançável com neutro $\pm\SI{250}{\micro\second}$ na Figura~\ref{fig:curva_aberta}. A Figura~\ref{fig:patamares} sobrepõe setpoint, velocidade filtrada e velocidade bruta, com o pulso comandado no gráfico inferior, e a Tabela~\ref{tab:patamares} traz as métricas por patamar.
+
+\begin{figure}[H]
+  \centering
+  \figura{patamares}{0.9\textwidth}
+  \caption{Cinco patamares. Acima: setpoint, velocidade filtrada e bruta. Abaixo: pulso, com o neutro e os limites de $\pm\SI{250}{\micro\second}$. \todo{gerar com \texttt{captura.py p}}}
+  \label{fig:patamares}
+\end{figure}
+
+\begin{table}[H]
+  \centering
+  \caption{Métricas dos cinco patamares (regime = último \SI{1}{\second} de cada patamar).}
+  \label{tab:patamares}
+  \begin{tabular}{cccccc}
+    \toprule
+    Setpoint & Regime & Erro & $t_{10\text{--}90\%}$ & Sobressinal & Tempo saturado \\
+    (mm/s) & (mm/s) & (mm/s) & (s) & (\%) & (\%) \\
+    \midrule
+    \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+    \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+    \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+    \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+    \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\todo{comentar: tempo de subida do primeiro degrau (saindo da banda morta), sobressinal, erro que resta em cada patamar, se a troca de patamar deixa a integral para trás (a integral é zerada na troca; ver se isso causa um afundamento logo após cada degrau) e se algum patamar saturou nos $\pm\SI{250}{\micro\second}$.}
+
+\subsection{Inversão de Sentido}\
+
+Neste ensaio aplicou-se \todo{+100}\,mm/s por \SI{4}{\second} e, em seguida, a mesma magnitude com sinal trocado por mais \SI{4}{\second}, de modo que a roda passa pelo zero (Figura~\ref{fig:inversao}).
+
+\begin{figure}[H]
+  \centering
+  \figura{inversao}{0.9\textwidth}
+  \caption{Inversão de sentido. Acima: setpoint, velocidade filtrada e bruta. Abaixo: pulso. \todo{gerar com \texttt{captura.py i}}}
+  \label{fig:inversao}
+\end{figure}
+
+\todo{comentar: tempo em que a roda fica parada na passagem pelo zero (banda morta), tempo até atingir o novo setpoint, se o pulso saturou em neutro $-\SI{250}{\micro\second}$ logo após a troca, diferença de erro/sobressinal entre os dois sentidos (relacionar com a assimetria da curva aberta).} O sentido da contagem foi conferido com o motor no ensaio em malha aberta (\texttt{SINAL\_ENCODER = -1}, Seção~\ref{sec:correcao_encoder}): pulsos acima do neutro produzem contagem crescente e o sinal da velocidade medida concorda com o do setpoint. \todo{confirmar no gráfico da inversão}
+
+\subsection{Distância Percorrida}\label{sec:distancia}
+
+A Figura~\ref{fig:distancia} mostra a distância $s = k\,n$ ao longo do tempo nos dois ensaios anteriores, calculada sem filtro a partir da contagem acumulada. Nos cinco patamares a inclinação da curva cresce a cada patamar, e na inversão a distância sobe, para e volta a diminuir.
+
+\begin{figure}[H]
+  \centering
+  \figura{distancia}{0.85\textwidth}
+  \caption{Distância percorrida nos ensaios de cinco patamares e de inversão.}
+  \label{fig:distancia}
+\end{figure}
+
+A distância final foi de \todo{}\,mm nos cinco patamares e de \todo{}\,mm na inversão (\todo{} voltas da roda). Como verificação independente, \todo{comparar com uma marca no chão ou com $\pi D$ vezes o número de voltas contado visualmente (p.\,ex., marca na roda) e discutir a diferença: erro em $D$, deformação da banda, escorregamento, folga das engrenagens na inversão}. Como referência, o valor integrado do setpoint nos cinco patamares seria $3\,\mathrm{s}\times(60+75+90+105+120)\,\mathrm{mm/s} = \SI{1350}{\milli\meter}$; a diferença para a distância medida reflete os transitórios e o erro de cada patamar, não um erro do encoder.
+
+\section{Discussão}\
+
+\todo{revisar e completar esta seção com os números medidos; o enunciado pede no mínimo uma página.}
+
+\paragraph{O que a curva aberta explica nos degraus.} O ganho da planta, isto é, quanto a velocidade varia por microssegundo de pulso, não é constante: ele é nulo dentro da banda morta, máximo logo acima dela e cai à medida que o servo se aproxima da saturação. Para um controlador com ganhos fixos isso significa que a malha é mais ``lenta'' nos patamares altos, onde cada microssegundo rende pouca velocidade, e mais agressiva nos baixos. O primeiro degrau, que parte do repouso, ainda precisa atravessar a banda morta: enquanto $u$ não supera essa faixa, a roda não se move, o erro permanece igual ao setpoint e a integral cresce, o que tende a produzir sobressinal quando a roda finalmente arranca. \todo{confirmar com a Figura~\ref{fig:patamares}.} A assimetria entre os sentidos aparece na inversão como diferença de erro ou de tempo de acomodação entre $+V$ e $-V$.
+
+\paragraph{O que o filtro atrasou.} O filtro torna a medida utilizável, mas o controlador passa a enxergar a velocidade com cerca de \SI{100}{\milli\second} de atraso, o que equivale a dois períodos de amostragem. Esse atraso dentro da malha limita o $K_p$ possível: acima de certo valor, a correção chega tarde e a malha oscila. Um filtro mais forte (menor $\alpha$ ou janela maior) reduziria a oscilação de $\pm q$ no pulso, mas aumentaria o sobressinal; um filtro mais fraco faria o pulso ``tremer'' a cada tick a mais ou a menos na janela. É por isso que, com medida quantizada, o termo derivativo pouco ajuda: ele amplifica justamente os degraus de $q$. \todo{relatar o que foi observado com $K_d \neq 0$, se testado.}
+
+\paragraph{Onde a malha saturou.} A correção está limitada a $\pm\SI{250}{\micro\second}$ em torno do neutro. Pela curva aberta, isso restringe a velocidade máxima controlável a \todo{}\,mm/s no sentido positivo e \todo{}\,mm/s no negativo. A saturação aparece principalmente nos instantes logo após uma troca de setpoint, sobretudo na inversão, em que o erro inicial vale $2V$. \todo{informar em quais trechos o pulso encostou no limite (coluna ``tempo saturado'' da Tabela~\ref{tab:patamares}).} Durante a saturação a integral é contida pelo limite de anti-windup, o que evita que ela continue crescendo e prolongue o sobressinal.
+
+\paragraph{Resolução em baixa velocidade.} Como $q \approx \SI{10,7}{\milli\meter\per\second}$, o patamar mais lento corresponde a poucos ticks por janela, e o erro em regime fica da ordem de uma fração de $q$. Aumentar $\Delta t$ melhoraria a resolução, mas aumentaria o atraso da medida; medir o tempo entre ticks (em vez de contar ticks em uma janela fixa) seria a alternativa para velocidades muito baixas.
+
+\paragraph{O que não ficou bom.} \todo{listar honestamente: p.\,ex., erro residual em algum patamar, oscilação em baixa velocidade, diferença entre $N$ nos dois sentidos, divergência na comparação de distância, variação do neutro com a tensão de alimentação ou com o aquecimento do servo, folga nas engrenagens.}
+
+\section{Conclusão}\
+
+O desenvolvimento da prática permitiu integrar a medição do encoder, a estimativa de velocidade, a filtragem do sinal e o controle do servo em um único sistema de malha fechada. Os ensaios realizados possibilitaram observar o comportamento do conjunto diante de diferentes referências de velocidade e durante a inversão do sentido de rotação, além de acompanhar a distância percorrida pela roda.
+
+De forma geral, o experimento evidencia a importância da realimentação para o controle de velocidade, uma vez que o comando aplicado ao servo não determina diretamente a velocidade obtida. A utilização do encoder e da etapa de filtragem permite obter uma medida mais adequada para o controlador e melhorar o acompanhamento da referência.
+
+\todo{síntese com os números finais: com $K_p = \ldots$, $K_i = \ldots$ e o filtro \ldots, a roda acompanha velocidades de \ldots a \ldots\,mm/s com erro em regime de \ldots\,mm/s e tempo de subida de \ldots\,s; a inversão leva \ldots\,s; a distância medida difere \ldots\,\% da referência.}
+
+
+\bibliographystyle{template/sbc}
+\bibliography{template/sbc-template}
+
+\end{document}

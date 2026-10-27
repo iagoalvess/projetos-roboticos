@@ -1,0 +1,47 @@
+== neutro: Δt real = 50.00 ± 0.49 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+== Busca do neutro
+    1450 us ->   -55.27 mm/s
+    1460 us ->   -44.43 mm/s
+    1470 us ->    -4.04 mm/s
+    1480 us ->     0.00 mm/s
+    1490 us ->     0.00 mm/s
+    1500 us ->     0.00 mm/s
+    1510 us ->     0.00 mm/s
+    1520 us ->     0.00 mm/s
+    1530 us ->     0.00 mm/s
+    1540 us ->    40.39 mm/s
+    1550 us ->    60.58 mm/s
+== malha_aberta: Δt real = 50.00 ± 0.53 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+== Curva em malha aberta (regime, após descartar 1.0 s de cada passo)
+    1000 us ( -500) ->  -246.06 mm/s
+    1050 us ( -450) ->  -225.76 mm/s
+    1100 us ( -400) ->  -208.84 mm/s
+    1150 us ( -350) ->  -184.28 mm/s
+    1200 us ( -300) ->  -169.13 mm/s
+    1250 us ( -250) ->  -143.38 mm/s
+    1300 us ( -200) ->  -129.75 mm/s
+    1350 us ( -150) ->  -103.56 mm/s
+    1400 us ( -100) ->   -86.33 mm/s
+    1450 us (  -50) ->   -62.60 mm/s
+    1500 us (   +0) ->     0.00 mm/s
+    1550 us (  +50) ->    51.50 mm/s
+    1600 us ( +100) ->    71.69 mm/s
+    1650 us ( +150) ->    91.38 mm/s
+    1700 us ( +200) ->   116.12 mm/s
+    1750 us ( +250) ->   141.87 mm/s
+    1800 us ( +300) ->   155.34 mm/s
+    1850 us ( +350) ->   166.48 mm/s
+    1900 us ( +400) ->   193.87 mm/s
+    1950 us ( +450) ->   215.07 mm/s
+    2000 us ( +500) ->   245.87 mm/s
+== Curva preliminar (firmware antigo, k de referência)
+    1600 us ->   250.8 ticks/s =   134.6 mm/s
+    1700 us ->   355.9 ticks/s =   191.0 mm/s
+    1800 us ->   382.3 ticks/s =   205.2 mm/s
+    1900 us ->   456.2 ticks/s =   244.8 mm/s
+    2000 us ->   520.9 ticks/s =   279.5 mm/s
+== degrau_filtros: Δt real = 49.99 ± 0.58 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+== Filtros no degrau (pulso 1650 us a partir de t = 1.00 s)
+  bruta        regime =   86.69 mm/s  desvio =  26.10 mm/s  t63 =  0.05 s
+  passa-baixa  regime =   87.30 mm/s  desvio =   7.02 mm/s  t63 =  0.25 s
+  media-movel  regime =   87.38 mm/s  desvio =   7.12 mm/s  t63 =  0.25 s
