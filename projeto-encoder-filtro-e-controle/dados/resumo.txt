@@ -45,3 +45,69 @@
   bruta        regime =   86.69 mm/s  desvio =  26.10 mm/s  t63 =  0.05 s
   passa-baixa  regime =   87.30 mm/s  desvio =   7.02 mm/s  t63 =  0.25 s
   media-movel  regime =   87.38 mm/s  desvio =   7.12 mm/s  t63 =  0.25 s
+== Sintonia (degraus em malha fechada)
+== degrau_pid_1: Δt real = 50.01 ± 0.59 ms (mín 49, máx 51); degrau k/Δt = 20.19 mm/s
+-- degrau_pid_1
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 1.0000, ki = 0.0000, kd = 0.0000, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =   46.15 ± 13.68  erro =  53.85 mm/s  subida(10-90%) =   nan s  t90 =   nan s  sobressinal =   0.0 %  saturado =   0.0 %
+  distância final = 184.8 mm (183 ticks, 1.31 voltas)
+== degrau_pid_2: Δt real = 50.00 ± 0.55 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+-- degrau_pid_2
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 0.0000, kd = 0.0000, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =   60.78 ±  6.88  erro =  39.22 mm/s  subida(10-90%) =   nan s  t90 =   nan s  sobressinal =   0.0 %  saturado =   0.0 %
+  distância final = 244.4 mm (242 ticks, 1.73 voltas)
+== degrau_pid_3: Δt real = 50.01 ± 0.59 ms (mín 49, máx 51); degrau k/Δt = 20.19 mm/s
+-- degrau_pid_3
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 4.0000, ki = 0.0000, kd = 0.0000, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =   69.05 ± 12.58  erro =  30.95 mm/s  subida(10-90%) =  0.15 s  t90 =  0.25 s  sobressinal =   5.0 %  saturado =   6.2 %
+  distância final = 287.8 mm (285 ticks, 2.04 voltas)
+== degrau_pid_4: Δt real = 50.00 ± 0.50 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+-- degrau_pid_4
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 2.0000, kd = 0.0000, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =   92.90 ±  9.81  erro =   7.10 mm/s  subida(10-90%) =  0.90 s  t90 =  1.00 s  sobressinal =  13.1 %  saturado =   0.0 %
+  distância final = 338.3 mm (335 ticks, 2.39 voltas)
+== degrau_pid_5: Δt real = 50.01 ± 0.59 ms (mín 49, máx 51); degrau k/Δt = 20.19 mm/s
+-- degrau_pid_5
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 4.0000, kd = 0.0000, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =   98.28 ±  6.87  erro =   1.72 mm/s  subida(10-90%) =  0.10 s  t90 =  0.20 s  sobressinal =  29.2 %  saturado =   0.0 %
+  distância final = 370.6 mm (367 ticks, 2.62 voltas)
+== degrau_pid_6: Δt real = 50.01 ± 0.53 ms (mín 49, máx 51); degrau k/Δt = 20.19 mm/s
+-- degrau_pid_6
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 8.0000, kd = 0.0000, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =   99.24 ± 12.81  erro =   0.76 mm/s  subida(10-90%) =  0.15 s  t90 =  0.20 s  sobressinal =  29.2 %  saturado =   2.5 %
+  distância final = 394.8 mm (391 ticks, 2.79 voltas)
+== degrau_pid_7: Δt real = 50.01 ± 0.59 ms (mín 49, máx 51); degrau k/Δt = 20.19 mm/s
+-- degrau_pid_7
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 4.0000, kd = 0.0500, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =  101.55 ±  6.97  erro =  -1.55 mm/s  subida(10-90%) =  0.50 s  t90 =  0.60 s  sobressinal =  17.1 %  saturado =   0.0 %
+  distância final = 379.7 mm (376 ticks, 2.69 voltas)
+== degrau_pid_8: Δt real = 50.00 ± 0.45 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+-- degrau_pid_8
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 4.0000, kd = 0.1000, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =  100.01 ± 11.14  erro =  -0.01 mm/s  subida(10-90%) =  0.30 s  t90 =  0.35 s  sobressinal =  21.2 %  saturado =   0.0 %
+  distância final = 373.6 mm (370 ticks, 2.64 voltas)
+== patamares: Δt real = 50.00 ± 0.53 ms (mín 49, máx 51); degrau k/Δt = 20.19 mm/s
+== Cinco patamares
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 4.0000, kd = 0.0500, filtro = media-movel (α = 0.300, janela = 5)
+  sp =    60.0  regime =   63.47 ± 11.09  erro =  -3.47 mm/s  subida(10-90%) =  0.20 s  t90 =  0.35 s  sobressinal =  41.4 %  saturado =   0.0 %
+  sp =    75.0  regime =   75.39 ±  9.19  erro =  -0.39 mm/s  subida(10-90%) =  0.35 s  t90 =  0.35 s  sobressinal =  92.4 %  saturado =   0.0 %
+  sp =    90.0  regime =   92.09 ±  9.26  erro =  -2.09 mm/s  subida(10-90%) =  0.05 s  t90 =  0.20 s  sobressinal = 153.9 %  saturado =   0.0 %
+  sp =   105.0  regime =  106.74 ±  4.59  erro =  -1.74 mm/s  subida(10-90%) =  0.20 s  t90 =  0.20 s  sobressinal = 107.8 %  saturado =   0.0 %
+  sp =   120.0  regime =  118.95 ± 10.57  erro =   1.05 mm/s  subida(10-90%) =  0.65 s  t90 =  0.65 s  sobressinal = 115.5 %  saturado =  11.7 %
+  distância final = 1321.8 mm (1309 ticks, 9.35 voltas)
+== patamares_v1: Δt real = 50.00 ± 0.54 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+== Cinco patamares, versão 1 (integral zerada a cada patamar)
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 4.0000, kd = 0.0500, filtro = media-movel (α = 0.300, janela = 5)
+  sp =    60.0  regime =   56.16 ± 10.19  erro =   3.84 mm/s  subida(10-90%) =  0.15 s  t90 =  0.20 s  sobressinal =  27.9 %  saturado =   0.0 %
+  sp =    75.0  regime =   74.62 ±  5.52  erro =   0.38 mm/s  subida(10-90%) =  1.45 s  t90 =  1.45 s  sobressinal =  65.5 %  saturado =   0.0 %
+  sp =    90.0  regime =   89.06 ±  7.82  erro =   0.94 mm/s  subida(10-90%) =  1.75 s  t90 =  1.80 s  sobressinal =  73.1 %  saturado =   0.0 %
+  sp =   105.0  regime =  100.97 ± 11.42  erro =   4.03 mm/s  subida(10-90%) =  1.50 s  t90 =  1.95 s  sobressinal = 161.6 %  saturado =   0.0 %
+  sp =   120.0  regime =  115.72 ±  6.16  erro =   4.28 mm/s  subida(10-90%) =  0.10 s  t90 =  1.50 s  sobressinal =  61.6 %  saturado =   3.3 %
+  distância final = 1192.6 mm (1181 ticks, 8.44 voltas)
+== inversao: Δt real = 50.00 ± 0.53 ms (mín 49, máx 51); degrau k/Δt = 20.20 mm/s
+== Inversão de sentido
+  condição: neutro = 1500 µs, k = 1.0098 mm/tick, Δt = 50 ms, kp = 2.0000, ki = 4.0000, kd = 0.0500, filtro = media-movel (α = 0.300, janela = 5)
+  sp =   100.0  regime =   96.55 ±  5.42  erro =   3.45 mm/s  subida(10-90%) =  0.20 s  t90 =  0.25 s  sobressinal =  13.1 %  saturado =   0.0 %
+  sp =  -100.0  regime =  -98.28 ±  7.20  erro =  -1.72 mm/s  subida(10-90%) =  0.20 s  t90 =  0.25 s  sobressinal =   6.5 %  saturado =   5.0 %
+  distância final = -18.2 mm (-18 ticks, -0.13 voltas)
+  tempo com v_bruta = 0 após a troca: 0.05 s

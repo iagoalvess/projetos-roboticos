@@ -6,7 +6,7 @@ Arduino Mega (com Motor Shield v2 empilhado) + MG90S de giro contínuo + encoder
 
 | Fio | Pino da Mega |
 |---|---|
-| Servo (sinal) | D9 (conector *Servo 2* do shield) |
+| Servo (sinal) | D9 (conector *Servo 2* do shield); alimentação por fonte externa, GND comum |
 | Encoder, terminal da ponta (canal A) | D2 |
 | Encoder, terminal da ponta (canal B) | D3 |
 | Encoder, terminal do **meio** (comum) | **GND** |
@@ -49,6 +49,7 @@ pio device monitor     # 115200 baud
 | `P<v>` `I<v>` `D<v>` | troca kp, ki, kd sem regravar (ex.: `P1.5`) | — |
 | `s` | para e aplica o neutro | — |
 | `e` | liga/desliga o diagnóstico do encoder (`A B ticks` a cada mudança dos pinos) | — |
+| `t` | alterna a saída entre CSV e o formato do Teleplot (`>v_mm:87.4`), para ver ao vivo | — |
 
 ```sh
 pip install pyserial numpy matplotlib
@@ -67,17 +68,16 @@ e tem as colunas `t_s,ticks,s_mm,v_raw,v_pb,v_mm,sp,pulso_us`.
 
 ## Constantes da bancada
 
-TODO: preencher após as medidas (e atualizar `servo_e_encoder.ino`).
 
 | D (mm) | N (ticks/volta) | k (mm/tick) | neutro (µs) | α | janela | kp | ki | kd |
 |---|---|---|---|---|---|---|---|---|
-| 45,0 (volta no papel) | 140 (N− = −143,2; N+ = 136,4) | 1,010 | 1500 (banda morta 1470–1530) | 0,3 | 5 (usada no PID) | TODO | TODO | TODO |
+| 45,0 (estimativa usada nos ensaios; volta no papel: L = 138,0 mm → D = 43,9) | 140 (N− = −143,2; N+ = 136,4) | 1,010 | 1500 (banda morta 1470–1530) | 0,3 | 5 (usada no PID) | 2 | 4 | 0,05 |
 
 ## Passo a passo
 
 Feito:
 
-- [x] D = 45,0 mm (volta marcada no papel).
+- [x] D = 45,0 mm nos ensaios; volta no papel L = 138, 137, 139 mm → D = 43,9 mm (k real ≈ 2,4% menor; ensaios não refeitos).
 - [x] Ligação do encoder corrigida (comum no GND) e decodificação ajustada no `Encoder.h`.
 - [x] Sentido da contagem: lado de 1000 µs negativo, lado de 2000 µs positivo (`SINAL_ENCODER = -1`, conferido com o motor).
 - [x] N = 140 ticks/volta (`N_TICKS`), k = 1,010 mm/tick.
@@ -86,13 +86,13 @@ Feito:
       ~142 mm/s em neutro ± 250 µs. `PATAMARES = {60, 75, 90, 105, 120}`, `V_INVERSAO = V_DEGRAU = 100`.
 - [x] Filtros (`dados/degrau_filtros.csv`): mesmo ruído (~7 mm/s) e atraso (t63 = 0,25 s);
       PID usa a média móvel, M = 5 (`PID_USA_PB = false`).
+- [x] Sintonia (`dados/degrau_pid_1` a `8`): kp = 2, ki = 4, kd = 0,05, gravados em `KP`, `KI`, `KD`.
+      Só P: kp = 4 já oscila. PI: ki = 2 lento, ki = 8 oscila, ki = 4 com pico de 29%.
+      kd = 0,05 tira o pico; kd = 0,1 só deixa o pulso ruidoso.
+- [x] Inversão (`dados/inversao.csv`): ±100 mm/s com erro < 6%, pulso no limite por 0,2 s na troca.
+- [x] Patamares (`dados/patamares.csv`): erro ≤ 3,5 mm/s, novo setpoint em ≤ 0,35 s; distância 1322 mm (−2,5%).
+      O primeiro ensaio (`dados/patamares_v1.csv`) zerava a integral a cada patamar e derrubava a roda;
+      o firmware agora só zera na troca de sentido ou no setpoint zero.
 
-A fazer:
+Pendências do relatório: nenhuma (`\todo` resolvidos).
 
-1. **Sintonia:** `python captura.py d --nome degrau_pid_<n> --ganhos P.. I.. D..`, uma por tentativa;
-   anotar cada uma e gravar os ganhos finais em `KP`, `KI`, `KD`.
-2. **Ensaios finais:** `python captura.py p` e `python captura.py i`, depois `python graficos.py`;
-   copiar os números de `dados/resumo.txt` para o relatório.
-3. Fotos (`foto_transmissao`, `foto_roda`, `foto_ligacao`) em `relatorio/relatorio-4/imagens/`.
-   Contar os dentes das engrenagens para explicar N = 140 contra os 288 da referência.
-4. Procurar `\todo` em `relatorio/relatorio-4.tex`.

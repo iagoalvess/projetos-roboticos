@@ -313,6 +313,27 @@ def patamares():
     return d
 
 
+def patamares_v1(d_pat):
+    # primeiro ensaio, com a integral zerada a cada troca de patamar
+    r = ler("patamares_v1")
+    if r is None or d_pat is None:
+        return
+    meta, d = r
+    nota("== Cinco patamares, versão 1 (integral zerada a cada patamar)")
+    relatorio_malha(meta, d, "patamares_v1")
+    fig, ax = plt.subplots(figsize=(6.5, 3.6))
+    ax.plot(d["t"], d["vf"], color=COR_PB, lw=1.3,
+            label=f"integral zerada a cada patamar (final = {d['s'][-1]:.0f} mm)")
+    ax.plot(d_pat["t"], d_pat["vf"], color=COR_MM, lw=1.3,
+            label=f"integral mantida (final = {d_pat['s'][-1]:.0f} mm)")
+    ax.step(d_pat["t"], d_pat["sp"], where="post", color=COR_SP, ls="--", label="setpoint")
+    ax.set_xlabel("tempo (s)")
+    ax.set_ylabel("velocidade filtrada (mm/s)")
+    ax.legend(fontsize=7)
+    ax.grid(alpha=0.3)
+    salvar(fig, "patamares_v1")
+
+
 def inversao():
     r = ler("inversao")
     if r is None:
@@ -354,6 +375,7 @@ def main():
     filtros()
     sintonia()
     d_pat = patamares()
+    patamares_v1(d_pat)
     d_inv = inversao()
     distancia(d_pat, d_inv)
     os.makedirs(DADOS, exist_ok=True)

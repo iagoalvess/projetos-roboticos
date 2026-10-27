@@ -1,3 +1,8 @@
+// ATENÇÃO!
+// intervalo de velocidade deve ser de -28 a +28
+
+
+
 #include <Arduino.h>
 #include <Servo.h>
 #include "Encoder.h"
@@ -16,6 +21,8 @@
 //   s -> para tudo (pulso = neutro)
 //   e -> liga/desliga o diagnóstico do encoder: imprime "A B ticks" a cada
 //        mudança dos pinos (girando devagar deve aparecer 00 01 11 10)
+//   t -> alterna a saída das amostras entre CSV (padrão, para captura.py) e
+//        o formato do Teleplot (">v_mm:87.4"), para ver o gráfico ao vivo
 //   P<valor>, I<valor>, D<valor> -> troca kp, ki ou kd sem regravar
 //                                   (ex.: "P1.5"); imprime os ganhos
 //
@@ -37,7 +44,7 @@ Servo m1;
 // TODO: substituir N e o neutro pelos valores medidos pela equipe (os atuais
 //       são os do mecanismo de referência e servem só de conferência).
 // ---------------------------------------------------------------------------
-const float D_MM = 45.0;     // diâmetro da roda na banda de contato (mm), volta marcada no papel
+const float D_MM = 45.0;     // diâmetro da roda (mm): estimativa usada em todos os ensaios; a volta no papel deu L = 138,0 mm (D = 43,9), ver relatório
 const float N_TICKS = 140.0; // ticks por volta da roda (X4, lido com 'c'): média dos módulos, 5 voltas em cada sentido
 const int NEUTRO_US = 1500;  // pulso em que a roda para: centro da banda morta 1470..1530 (achado com 'n')
 
@@ -50,21 +57,26 @@ const int SINAL_ENCODER = -1;
 const float K_MM_TICK = PI * D_MM / N_TICKS; // mm por tick
 
 // Período de amostragem / controle
-const unsigned long PERIODO_US = 50000UL; // 50 ms
+// 250 us não era atingido: a impressão serial de cada amostra leva ~10 ms, então
+// o período real virava ~10 ms, com 0 ou 1 tick por amostra. 20 ms cabe a
+// impressão do Teleplot e ainda dá 50 pontos/s.
+const unsigned long PERIODO_US = 20000UL; // 20 ms
 
 // Limites do pulso
 const int PULSO_MIN = 1000;
 const int PULSO_MAX = 2000;
-const float U_MAX = 250.0; // correção máxima em torno do neutro (us)
+const float U_MAX = 1000.0; // correção máxima em torno do neutro (us)
 
 // ---------------------------------------------------------------------------
 // Filtros da velocidade
 // ---------------------------------------------------------------------------
-const float ALFA = 0.3;    // passa-baixa de primeira ordem
+// alfa = 0,15 a 20 ms tem a mesma constante de tempo (~0,12 s) do alfa = 0,3 a
+// 50 ms testado no ensaio 'f'; 0,1 a 20 ms deixaria o filtro mais lento (0,18 s).
+const float ALFA = 0.05;   // passa-baixa de primeira ordem
 const int JANELA_MM = 5;   // média móvel (amostras)
 // No ensaio 'f' os dois filtros tiveram o mesmo ruído e o mesmo atraso; a média
 // móvel deu derivada menos ruidosa e chegou a zero mais cedo na parada.
-const bool PID_USA_PB = false; // true: PID usa o passa-baixa; false: média móvel
+const bool PID_USA_PB = true; // true: PID usa o passa-baixa; false: média móvel
 
 float v_pb = 0;
 float passaBaixa(float x) {
@@ -85,14 +97,22 @@ float mediaMovel(float x) {
 // ---------------------------------------------------------------------------
 // Controlador PID
 //   u = kp e + ki ∫e dt − kd dv/dt   (e em mm/s, u em us)
-// O derivativo atua sobre a velocidade filtrada; a integral é limitada e é
-// zerada quando o setpoint muda.
+// O derivativo atua sobre a velocidade filtrada; a integral é limitada e só é
+// zerada quando o setpoint troca de sentido (ou vai a zero). Numa subida de
+// patamar ela é mantida: é ela que segura o pulso, e zerar derrubava a roda
+// (ensaio patamares_v1).
 // Sintonia (ensaio 'd'): ki = kd = 0, sobe kp até oscilar e volta um pouco;
 // depois sobe ki até o erro em regime sumir; kd só se sobrar sobressinal.
 // ---------------------------------------------------------------------------
-float KP = 1.0;  // us / (mm/s)   TODO: ganho final da sintonia
-float KI = 0.0;  // us / mm       TODO: ganho final da sintonia
-float KD = 0.0;  // us·s / mm     TODO: ganho final da sintonia
+// Resultado (degrau_pid_1 a 8): kp = 4 já oscila; ki = 8 volta a oscilar;
+// kd = 0,05 tira o pico inicial, kd = 0,1 só deixa o pulso mais ruidoso.
+// Com a velocidade multiplicada por 4,4*pi/140 (~0,0987, unidade ~cm/s), um
+// erro de 1 unidade vale ~10 mm/s: kp e ki foram multiplicados por ~10 para
+// manter a mesma malha da sintonia (2 us/(mm/s) e 4 us/mm). kd = 0 porque a
+// derivada a cada 20 ms é ruidosa demais (a 50 ms já estava no limite).
+float KP = 20.0;  // us / unidade de v
+float KI = 40.0;  // us / (unidade de v · s)
+float KD = 0.0;   // us·s / unidade de v
 
 float integral = 0;
 float vf_ant = 0;
@@ -130,6 +150,7 @@ int n_passos = 0;
 bool malha_fechada = false;
 bool ativo = false;
 bool diag_enc = false;
+bool teleplot = false;  // 't': amostras no formato do Teleplot em vez de CSV
 
 int passo = -1;
 unsigned long t_ini_ms = 0;   // início do ensaio
@@ -154,7 +175,7 @@ void carregaAberta() {
   malha_fechada = false;
   n_passos = 0;
   for (int p = PULSO_MIN; p <= PULSO_MAX; p += 50)
-    seq[n_passos++] = {3000, (float)p};
+    seq[n_passos++] = {5000, (float)p};
 }
 
 void carregaDegrau() {
@@ -169,7 +190,7 @@ void carregaDegrauFechado() {
   malha_fechada = true;
   n_passos = 0;
   seq[n_passos++] = {1000, 0};
-  seq[n_passos++] = {4000, V_DEGRAU};
+  seq[n_passos++] = {4000, V_DEGRAU/8.0};
   seq[n_passos++] = {1000, 0};
 }
 
@@ -299,6 +320,10 @@ void trataSerial() {
       diag_enc = !diag_enc;
       Serial.println(diag_enc ? F("# diag encoder: A B ticks") : F("# diag encoder off"));
       break;
+    case 't':
+      teleplot = !teleplot;
+      Serial.println(teleplot ? F("# saida: teleplot") : F("# saida: csv"));
+      break;
     // Troca de ganho só fora de um ensaio, para o registro não misturar ganhos.
     case 'P': if (!ativo) KP = Serial.parseFloat(); imprimeGanhos(); break;
     case 'I': if (!ativo) KI = Serial.parseFloat(); imprimeGanhos(); break;
@@ -327,6 +352,23 @@ void diagnosticoEncoder() {
   Serial.println(leTicks());
 }
 
+// Formato do Teleplot (extensão do VS Code): uma linha ">nome:valor" por variável.
+// O Teleplot ajusta o eixo aos dados, então v_lim_max e v_lim_min (constantes)
+// fixam a escala em ±V_ESCALA: neutro ± 250 us dá +142 e -143 mm/s na curva
+// aberta, e com essas linhas no mesmo gráfico o setpoint não muda de posição.
+const float V_ESCALA = 150; // mm/s
+
+void imprimeTeleplot(float v, float vpb, float vmm, float sp, float s) {
+  Serial.print(F(">v_lim_max:")); Serial.println(V_ESCALA, 0);
+  Serial.print(F(">v_lim_min:")); Serial.println(-V_ESCALA, 0);
+  Serial.print(F(">v_raw:"));  Serial.println(v, 1);
+  Serial.print(F(">v_pb:"));   Serial.println(vpb, 2);
+  Serial.print(F(">v_mm:"));   Serial.println(vmm, 1);
+  Serial.print(F(">sp:"));     Serial.println(sp, 1);
+  Serial.print(F(">pulso:"));  Serial.println(double(pulso), 2);
+  Serial.print(F(">s_mm:"));   Serial.println(s, 1);
+}
+
 void loop() {
   trataSerial();
   if (diag_enc) diagnosticoEncoder();
@@ -341,7 +383,7 @@ void loop() {
 
   long ticks = leTicks();
   float s = K_MM_TICK * ticks;
-  float v = K_MM_TICK * (ticks - ticks_ant) / dt; // mm/s
+  float v = K_MM_TICK * (ticks - ticks_ant) / dt * (4.4 * 3.1415 / 140); // mm/s
   ticks_ant = ticks;
 
   float vpb = passaBaixa(v);
@@ -357,23 +399,29 @@ void loop() {
       return;
     }
     imprimePasso();
-    if (malha_fechada) resetPID(PID_USA_PB ? vpb : vmm);
+    if (malha_fechada && seq[passo].valor * seq[passo - 1].valor <= 0)
+      resetPID(PID_USA_PB ? vpb : vmm);
   }
 
   float sp = 0;
   if (malha_fechada) {
     sp = seq[passo].valor;
     float vf = PID_USA_PB ? vpb : vmm;
-    if (sp == 0) {
-      // Setpoint nulo: roda parada no neutro, sem o PI caçar a banda morta.
-      resetPID(vf);
-      escrevePulso(NEUTRO_US);
-    } else {
+    // if (sp == 0) {
+    //   // Setpoint nulo: roda parada no neutro, sem o PI caçar a banda morta.
+    //   resetPID(vf);
+    //   escrevePulso(NEUTRO_US);
+    // } else {
       float u = controlePID(sp, vf, dt);
       escrevePulso(NEUTRO_US + (int)u);
-    }
+    // }
   } else {
     escrevePulso((int)seq[passo].valor);
+  }
+
+  if (teleplot) {
+    imprimeTeleplot(v, vpb, vmm, sp, s);
+    return;
   }
 
   Serial.print((agora_ms - t_ini_ms) / 1000.0, 3);
@@ -384,11 +432,11 @@ void loop() {
   Serial.print(',');
   Serial.print(v, 2);
   Serial.print(',');
-  Serial.print(vpb, 2);
+  Serial.print(vpb/240, 2);
   Serial.print(',');
   Serial.print(vmm, 2);
   Serial.print(',');
   Serial.print(sp, 1);
   Serial.print(',');
-  Serial.println(pulso);
+  Serial.println((pulso - 1500)*0.002);
 }
