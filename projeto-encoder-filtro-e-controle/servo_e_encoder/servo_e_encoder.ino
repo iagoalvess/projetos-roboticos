@@ -60,7 +60,7 @@ const float K_MM_TICK = PI * D_MM / N_TICKS; // mm por tick
 // 250 us não era atingido: a impressão serial de cada amostra leva ~10 ms, então
 // o período real virava ~10 ms, com 0 ou 1 tick por amostra. 20 ms cabe a
 // impressão do Teleplot e ainda dá 50 pontos/s.
-const unsigned long PERIODO_US = 20000UL; // 20 ms
+const unsigned long PERIODO_US = 250UL; // 250 us
 
 // Limites do pulso
 const int PULSO_MIN = 1000;
@@ -110,8 +110,8 @@ float mediaMovel(float x) {
 // erro de 1 unidade vale ~10 mm/s: kp e ki foram multiplicados por ~10 para
 // manter a mesma malha da sintonia (2 us/(mm/s) e 4 us/mm). kd = 0 porque a
 // derivada a cada 20 ms é ruidosa demais (a 50 ms já estava no limite).
-float KP = 20.0;  // us / unidade de v
-float KI = 40.0;  // us / (unidade de v · s)
+float KP = 1.0;  // us / unidade de v
+float KI = 0.0;  // us / (unidade de v · s)
 float KD = 0.0;   // us·s / unidade de v
 
 float integral = 0;
@@ -159,9 +159,9 @@ unsigned long t_passo_ms = 0; // início do passo atual
 // Escolhidos a partir da curva em malha aberta: abaixo de ~50 mm/s a roda não
 // gira de forma estável, e em neutro ± 250 us (limite de U_MAX) o lado mais
 // lento chega a ~137 mm/s.
-const float PATAMARES[5] = {60, 75, 90, 105, 120}; // mm/s
-const float V_INVERSAO = 100;                        // mm/s
-const float V_DEGRAU = 100;                          // mm/s (sintonia)
+const float PATAMARES[5] = {2.5, 5, 7.5, 10, 12.5}; // mm/s
+const float V_INVERSAO = 10;                        // mm/s
+const float V_DEGRAU = 12.5;                          // mm/s (sintonia)
 
 void carregaNeutro() {
   malha_fechada = false;
@@ -190,7 +190,7 @@ void carregaDegrauFechado() {
   malha_fechada = true;
   n_passos = 0;
   seq[n_passos++] = {1000, 0};
-  seq[n_passos++] = {4000, V_DEGRAU/8.0};
+  seq[n_passos++] = {4000, V_DEGRAU};
   seq[n_passos++] = {1000, 0};
 }
 
