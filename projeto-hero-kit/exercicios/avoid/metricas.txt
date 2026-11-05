@@ -1,0 +1,2 @@
+log_avoid_A_20261104_223345.csv: duracao=300.0 s  distancia=42.82 m  colisoes=0  menor leitura=0.114 m  area coberta=1.83 m2 (ultimos 100 s: 1.28 m2)
+log_avoid_B_20261104_224016.csv: duracao=300.0 s  distancia=59.24 m  colisoes=0  menor leitura=0.066 m  area coberta=1.76 m2 (ultimos 100 s: 0.60 m2)
