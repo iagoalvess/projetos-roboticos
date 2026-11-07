@@ -6,6 +6,6 @@
 
 ## [Relatório 3](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-TCRT5000/ProjSistemasRoboticos-SensorTCRT5000.pdf)
 
-## Relatório 4
+## [Relatório 4](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-encoder-filtro-e-controle/relatorio/ProjSistemasRoboticos-relatorio4.pdf)
 
 ## Relatório 5
