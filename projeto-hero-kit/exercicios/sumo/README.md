@@ -45,3 +45,25 @@ Argumentos: `robot0:=` e `robot1:=` recebem o nome de um arquivo desta pasta ou 
 - use a distância do seu robô ao centro (`math.hypot(x, y)`) para não sair sozinho;
 - empurrar na direção que leva o adversário para a borda mais próxima é mais eficaz do que empurrar para o centro dele;
 - dois nós idênticos podem travar um contra o outro: experimente variações de estratégia.
+
+## Ensaios da equipe
+
+| Arquivo | O que é |
+|---|---|
+| `estrategia-sumo.pdf` | a estratégia, os testes e os resultados |
+| `sumo.py` | estratégia final |
+| `oponente_a.py` | oponente A, a versão anterior: a lei do `goto` do TP5 apontada para o adversário |
+| `oponente_b.py` | oponente B: vai sempre a 0,2 m/s contra o outro |
+| `teste_fisica.py` | testes de empurrão com comandos fixos |
+| `rodar_sumo.sh` + `placar.py` | rodadas sem janela, com o resultado de cada uma em `log_sumo_*.csv` |
+
+```bash
+cd exercicios/sumo
+./rodar_sumo.sh 20 sumo.py none 1            # contra o robô parado
+./rodar_sumo.sh 20 sumo.py oponente_a.py 1  # contra o oponente A
+./rodar_sumo.sh 20 oponente_a.py sumo.py 1  # trocando de lado
+./rodar_sumo.sh 10 sumo.py oponente_b.py 1  # contra o oponente B
+```
+
+O primeiro argumento é o número de rodadas, depois os arquivos de `hero_0` e `hero_1` e a semente.
+O vídeo `video_sumo.mp4` mostra `sumo.py` (azul) contra o oponente A (laranja).
