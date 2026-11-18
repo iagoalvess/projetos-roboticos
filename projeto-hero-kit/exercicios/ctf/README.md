@@ -60,3 +60,34 @@ Argumentos: `blue:=` e `red:=` recebem o nome de um arquivo desta pasta ou `none
 - o defensor pode ficar entre a própria bandeira e o atacante adversário, avançando só quando ele cruza x = 0;
 - quando `own_flag` está longe da sua base, um adversário está com a sua bandeira: persiga-o na sua metade;
 - no campo inimigo, o atacante deve desviar do defensor adversário (a odometria dele está em `opponents`).
+
+## Ensaios da equipe
+
+| Arquivo | O que é |
+|---|---|
+| `estrategia-ctf.pdf` | a estratégia, os testes e os resultados |
+| `ctf.py` | estratégia final (defensor "tampa" e atacante com planejador) |
+| `oponente_a.py` | oponente A, a versão anterior: a lei do `goto` do TP5, atacante direto e defensor que persegue |
+| `oponente_b.py` | oponente B: a nossa defesa com um atacante que vai e volta em linha reta |
+| `rodar_ctf.sh` + `placar.py` | partidas de 5 min sem janela, com os eventos e a trilha dos robôs em `log_ctf_*.csv` |
+| `fastsim.py` | simulador simplificado (juiz do kit + física 2D calibrada no sumô): uma partida de 5 min em ~2 s |
+
+```bash
+cd exercicios/ctf
+./rodar_ctf.sh 3 ctf.py none 1            # 3 partidas contra o time parado
+./rodar_ctf.sh 3 none ctf.py 1            # trocando de lado
+./rodar_ctf.sh 3 ctf.py oponente_a.py 1  # contra o oponente A
+./rodar_ctf.sh 3 oponente_a.py ctf.py 1  # trocando de lado
+./rodar_ctf.sh 2 ctf.py oponente_b.py 1  # contra o oponente B
+```
+
+O primeiro argumento é o número de partidas, depois os arquivos do time azul e do vermelho e a semente.
+O vídeo `video_ctf.mp4` mostra `ctf.py` (azul) contra o oponente A (vermelho).
+
+O `fastsim.py` roda no container do simulador, a partir da raiz do kit:
+
+```bash
+docker run --rm -v "$PWD:/kit" -w /kit/exercicios/ctf -e PYTHONPATH=/kit/sim:/kit/exercicios/ctf \
+  psr-kit-sim:cpu python fastsim.py ctf oponente_a 4                       # 4 partidas
+docker run --rm -v "$PWD:/kit" -w /kit/exercicios/ctf -e PYTHONPATH=/kit/sim:/kit/exercicios/ctf \
+  psr-kit-sim:cpu python fastsim.py torneio "ctf,ctf@PIN=0,oponente_a,oponente_b" 4  # todos contra todos
