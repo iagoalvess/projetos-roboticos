@@ -8,4 +8,4 @@
 
 ## [Relatório 4](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-encoder-filtro-e-controle/relatorio/ProjSistemasRoboticos-relatorio4.pdf)
 
-## Relatório 5
+## [Relatório 5](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-hero-kit/relatorio/relatorio-5/ProjSistemasRoboticos_relatorio5.pdf)
