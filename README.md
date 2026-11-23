@@ -9,3 +9,9 @@
 ## [Relatório 4](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-encoder-filtro-e-controle/relatorio/ProjSistemasRoboticos-relatorio4.pdf)
 
 ## [Relatório 5](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-hero-kit/relatorio/relatorio-5/ProjSistemasRoboticos_relatorio5.pdf)
+
+## Entrega do trabalho final
+
+A pasta [projeto-final](projeto-final/) contém somente os três controladores da competição:
+[sumo.py](projeto-final/sumo.py), [ctf.py](projeto-final/ctf.py) e [soccer.py](projeto-final/soccer.py).
+Os arquivos são independentes, funcionam nos dois lados e não gravam dados na pasta do código.
