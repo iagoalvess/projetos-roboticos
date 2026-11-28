@@ -16,4 +16,4 @@ A pasta [projeto-final](projeto-final/) contém somente os três controladores d
 [sumo.py](projeto-final/sumo.py), [ctf.py](projeto-final/ctf.py) e [soccer.py](projeto-final/soccer.py).
 Os arquivos são independentes, funcionam nos dois lados e não gravam dados na pasta do código.
 
-## [Relatório do final](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-final/ProjSistemasRoboticos_trabalhoFinal.pdf)
+## [Relatório final](https://github.com/iagoalvess/projetos-roboticos/blob/main/projeto-final/ProjSistemasRoboticos_trabalhoFinal.pdf)
